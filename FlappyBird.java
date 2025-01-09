@@ -176,7 +176,7 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
             return Float.compare(scoreB, scoreA);
         });
 
-        while (highScores.size() > 5) {
+        while (highScores.size() > 10) {
             highScores.remove(highScores.size() - 1);
         }
 
@@ -186,8 +186,8 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
     private void checkAndUpdateHighScore() { //Validación de que un puntaje es mayor a otro
         boolean isNewRecord = false;
 
-        // Verificar si el puntaje actual es mayor que alguno de los 5 mejores
-        if (highScores.size() < 5) {
+        // Verificar si el puntaje actual es mayor que alguno de los 10 mejores
+        if (highScores.size() < 10) {
             // Si hay menos de 5 puntuaciones, agregar el nuevo récord directamente
             String playerName = getValidPlayerName();
             if (playerName != null) {
@@ -196,8 +196,8 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
                 isNewRecord = true;
             }
         } else {
-            // Verificar si el puntaje supera alguno de los 5 mejores
-            for (int i = 0; i < 5; i++) {
+            // Verificar si el puntaje supera alguno de los 10 mejores
+            for (int i = 0; i < 10; i++) {
                 float highScore = Float.parseFloat(highScores.get(i).split(" ")[1]);
 
                 if (score > highScore) {
