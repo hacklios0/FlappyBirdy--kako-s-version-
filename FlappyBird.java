@@ -5,7 +5,7 @@ import java.awt.event.*;
 import java.io.*;
 import java.util.ArrayList;
 
-public class FlappyBird extends JPanel implements ActionListener, KeyListener {
+public class FlappyBird extends JPanel implements KeyListener { //ActionListener,
     private int birdY = 250; // Posición inicial del pájaro
     private int birdVelocity = 0;
     private int gravity = 1;
@@ -21,6 +21,10 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
     private Image pipeImage1, pipeImage2, pipeImage3; // Imagen de las tuberías
     private Image backgroundImage1, backgroundImage2, backgroundImage3; // Imagen del fondo
     private int textureSet = 0; // Bandera para controlar cuál conjunto de texturas se usa
+    private int birdImageIndex = 0; // Índice de la imagen actual del pájaro
+    private final Image[] birdImagesSet1 = new Image[3]; // Conjunto de imágenes del pájaro para el set 1
+
+
 
     private final ArrayList<String> highScores = new ArrayList<>();
     private final String SCORE_FILE = "scores.txt"; // Archivo de texto de los scores
@@ -34,6 +38,60 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
             this.isTop = isTop;
         }
     }
+
+    // Hilo para mover las tuberías y la gravedad
+    class GameThread extends Thread {
+        @Override
+        public void run() {
+            while (!gameOver) {
+                birdVelocity += gravity;
+                birdY += birdVelocity;
+    
+                for (int i = 0; i < pipes.size(); i++) {
+                    Pipe pipe = pipes.get(i); // Aquí obtenemos el objeto Pipe completo
+                    pipe.rect.x -= PIPE_SPEED; // Accedemos al rectángulo de la tubería y modificamos su posición
+    
+                    if (pipe.rect.intersects(new Rectangle(100, birdY, 30, 30))) {
+                        gameOver = true;
+                        checkAndUpdateHighScore(); // Verifica si el puntaje es un nuevo récord
+                        repaint();
+                    }
+    
+                    if (pipe.rect.x + PIPE_WIDTH < 0) {
+                        pipes.remove(i);
+                        i--;
+                    }
+                }
+    
+                if (pipes.size() < 10) {
+                    addPipe(800);
+                }
+    
+                for (Pipe pipe : pipes) {
+                    if (pipe.rect.x == 100) {
+                        score += 0.5;
+                    }
+                }
+    
+                if (birdY < 0 || birdY > getHeight()) {
+                    gameOver = true;
+                    checkAndUpdateHighScore(); // Verifica si el puntaje es un nuevo récord
+                    repaint();
+                }
+    
+                repaint();
+
+                try {
+                    Thread.sleep(20); // Controla la velocidad de actualización (20 ms entre cada actualización)
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    // Agregar una variable para el hilo del juego
+    private GameThread gameThread;
 
     public FlappyBird() {
         loadHighScores();
@@ -54,13 +112,15 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
 
         frame.setVisible(true);
 
-        timer = new javax.swing.Timer(20, this);
-        timer.start();
+        //timer = new javax.swing.Timer(20, this);
+        //timer.start();
 
         // Generar las primeras tuberías
         for (int i = 0; i < 5; i++) {
             addPipe(800 + i * 200);
         }
+        gameThread = new GameThread();
+        gameThread.start();
     }
 
     private String getValidPlayerName() {
@@ -90,8 +150,11 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
         try {
             // Paquete de imagenes 1
             birdImage1 = new ImageIcon(getClass().getResource("/recursos/bird1.png")).getImage();
-            pipeImage1 = new ImageIcon(getClass().getResource("/recursos/pipe1.png")).getImage();
-            backgroundImage1 = new ImageIcon(getClass().getResource("/recursos/fondo1.png")).getImage();
+             pipeImage1 = new ImageIcon(getClass().getResource("/recursos/pipe1.png")).getImage();
+             backgroundImage1 = new ImageIcon(getClass().getResource("/recursos/fondo1.png")).getImage();
+             birdImagesSet1[0] = new ImageIcon(getClass().getResource("/recursos/bird1a.png")).getImage();
+             birdImagesSet1[1] = new ImageIcon(getClass().getResource("/recursos/bird1b.png")).getImage();
+             birdImagesSet1[2] = new ImageIcon(getClass().getResource("/recursos/bird1c.png")).getImage();
 
             // Paquete de imagenes 2
             birdImage2 = new ImageIcon(getClass().getResource("/recursos/bird2.png")).getImage();
@@ -104,6 +167,12 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
             backgroundImage3 = new ImageIcon(getClass().getResource("/recursos/fondo3.png")).getImage();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void updateBirdImage() {
+        if (textureSet == 0) { // Solo cambia las imágenes si el conjunto actual es el 0
+            birdImageIndex = (birdImageIndex + 1) % birdImagesSet1.length; // Avanza al siguiente índice
         }
     }
 
@@ -133,7 +202,7 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-    private void resetGame() { //Resetear el juego a los valores de inicio
+    private void resetGame() {
         birdY = 250;
         birdVelocity = 0;
         score = 0;
@@ -143,6 +212,14 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
         for (int i = 0; i < 5; i++) {
             addPipe(800 + i * 200);
         }
+        repaint();
+    
+        // Detener el hilo anterior
+        gameThread.interrupt(); // Interrumpe el hilo existente
+    
+        // Crear y comenzar un nuevo hilo de juego
+        gameThread = new GameThread();
+        gameThread.start(); // Inicia un nuevo hilo del juego
     }
 
     private void loadHighScores() { //Leemos el archivo de puntajes
@@ -228,14 +305,18 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
     protected void paintComponent(Graphics g) { //Cambio de escenas y dibujos
         super.paintComponent(g);
 
-        // Fondo
         Image currentBackground = (textureSet == 0) ? backgroundImage1
-                : (textureSet == 1) ? backgroundImage2 : backgroundImage3;
+        : (textureSet == 1) ? backgroundImage2 : backgroundImage3;
         g.drawImage(currentBackground, 0, 0, getWidth(), getHeight(), this);
 
         // Pájaro
-        Image currentBird = (textureSet == 0) ? birdImage1 : (textureSet == 1) ? birdImage2 : birdImage3;
-        g.drawImage(currentBird, 100, birdY, 30, 30, this);
+        Image currentBird;
+        if (textureSet == 0) {
+        currentBird = birdImagesSet1[birdImageIndex]; // Cambiar la imagen solo para el set 0
+        } else {
+         currentBird = (textureSet == 1) ? birdImage2 : birdImage3; // Imagen fija para otros sets
+        }
+        g.drawImage(currentBird, 100, birdY, 30, 30, this); 
 
         // Tuberías
         for (Pipe pipe : pipes) {
@@ -289,7 +370,7 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
             g.drawString((i + 1) + ". " + highScores.get(i), 600, 50 + i * 20);
         }
     }
-
+  /* 
     @Override
     public void actionPerformed(ActionEvent e) {
         if (!gameOver) {
@@ -330,21 +411,22 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
 
             repaint();
         }
-    }
+    } */
 
     @Override
     public void keyPressed(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.VK_C) { // Usar C para cambiar entre los 3 conjuntos de texturas
-            textureSet = (textureSet + 1) % 3; // Incrementar y usar módulo 3 para alternar entre 0, 1, 2
+        if (e.getKeyCode() == KeyEvent.VK_C) { // Cambiar conjunto de texturas
+            textureSet = (textureSet + 1) % 3;
         }
         if (e.getKeyCode() == KeyEvent.VK_SPACE && !gameOver) {
             birdVelocity = -10;
+            updateBirdImage(); // Cambiar la imagen del pájaro al presionar espacio
         }
-
+    
         if (e.getKeyCode() == KeyEvent.VK_ENTER && gameOver) {
             resetGame();
         }
-
+    
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE && gameOver) {
             int choice = JOptionPane.showConfirmDialog(null, "¿Deseas regresar al menú principal?", "Confirmar",
                     JOptionPane.YES_NO_OPTION);
@@ -354,6 +436,7 @@ public class FlappyBird extends JPanel implements ActionListener, KeyListener {
             }
         }
     }
+    
 
     @Override
     public void keyReleased(KeyEvent e) {
